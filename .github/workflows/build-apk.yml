@@ -27,6 +27,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup host shader tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools spirv-tools
+          glslangValidator --version
+          spirv-opt --version
+
       - name: Setup Android SDK packages
         shell: bash
         run: |
