@@ -43,21 +43,41 @@ jobs:
         shell: bash
         run: |
           sed -i '/^org\.gradle\.java\.home=/d' storm/src/android/gradle.properties
-          grep -n 'org.gradle.java.home' storm/src/android/gradle.properties || true
 
       - name: Build arm64 Nightly Release APK
+        id: storm_build
+        continue-on-error: true
         working-directory: storm
         shell: bash
         env:
           CCACHE: 'false'
         run: |
           chmod +x .ci/android/build.sh src/android/gradlew
-          .ci/android/build.sh -n -t standard -b Release
+          set +e
+          .ci/android/build.sh -n -t standard -b Release > "$GITHUB_WORKSPACE/storm-build.log" 2>&1
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Print concise build failure
+        if: steps.storm_build.outputs.rc != '0'
+        shell: bash
+        run: |
+          echo '===== STORM BUILD ERROR: LAST 180 LINES ====='
+          tail -n 180 "$GITHUB_WORKSPACE/storm-build.log"
+          echo '===== END STORM BUILD ERROR ====='
+
+      - name: Fail when compiler failed
+        if: steps.storm_build.outputs.rc != '0'
+        shell: bash
+        run: exit 1
 
       - name: Show artifacts
+        if: steps.storm_build.outputs.rc == '0'
         run: find storm/artifacts -maxdepth 2 -type f -printf '%p %k KB\n' || true
 
       - name: Upload STORM EDEN APK
+        if: steps.storm_build.outputs.rc == '0'
         uses: actions/upload-artifact@v4
         with:
           name: STORM-EDEN-4.7.4-Android-arm64-nightly
