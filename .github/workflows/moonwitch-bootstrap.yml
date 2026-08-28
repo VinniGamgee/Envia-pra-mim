@@ -1,0 +1,63 @@
+name: Bootstrap Moonwitch source
+
+on:
+  push:
+    branches:
+      - moonwitch-bootstrap
+    paths:
+      - 'moonwitch/**'
+      - '.github/workflows/moonwitch-bootstrap.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout bootstrap controls
+        uses: actions/checkout@v4
+        with:
+          path: control
+
+      - name: Checkout STORM EDEN 4.7.4 base
+        uses: actions/checkout@v4
+        with:
+          repository: ReiKatari/STORM_EDEN
+          ref: 6da6709e28e240a17df138b3bee57f93aa75526d
+          path: moonwitch-source
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Apply Moonwitch identity and diagnostics
+        shell: bash
+        run: |
+          cp control/moonwitch/apply_branding.py moonwitch-source/apply_moonwitch_branding.py
+          cd moonwitch-source
+          python3 apply_moonwitch_branding.py
+          mkdir -p tools/moonwitch
+          mv apply_moonwitch_branding.py tools/moonwitch/apply_branding.py
+          sed -i '/^org\.gradle\.java\.home=/d' src/android/gradle.properties
+
+      - name: Commit Moonwitch source tree
+        working-directory: moonwitch-source
+        shell: bash
+        run: |
+          git config user.name "Moonwitch CI"
+          git config user.email "actions@users.noreply.github.com"
+          git switch -C moonwitch-main
+          git add -A
+          git commit -m "Moonwitch 0.1.0-alpha: initial fork branding and Android diagnostics"
+
+      - name: Push Moonwitch source branch
+        working-directory: moonwitch-source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_REPO: ${{ github.repository }}
+        run: |
+          git remote add moonwitch "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git"
+          git push --force moonwitch HEAD:refs/heads/moonwitch-main
